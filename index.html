@@ -1,0 +1,53 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>Son D'licias | Menú y pedidos por WhatsApp</title>
+<meta name="description" content="Menú de Son D'licias en Calabozo: hamburguesas, perros calientes, pepitos, club house y salchipapas. Arma tu pedido y envíalo por WhatsApp.">
+<meta name="theme-color" content="#C8141C">
+<link rel="icon" href="img/favicon.png" type="image/png">
+<link rel="apple-touch-icon" href="img/apple-touch-icon.png">
+<link rel="preload" href="fonts/poppins-700.woff" as="font" type="font/woff" crossorigin>
+<link rel="stylesheet" href="css/comun.css">
+<link rel="stylesheet" href="css/tienda.css">
+</head>
+<body class="tienda">
+<header class="cabecera" id="cabecera">
+  <div class="cabecera-fila">
+    <div class="insignia"><img src="img/logo.webp" alt="" width="228" height="166"></div>
+    <div class="marca">
+      <p class="marca-nombre">Son D'licias</p>
+      <p class="marca-lema">Menú y pedidos por WhatsApp</p>
+    </div>
+    <button class="bolsa redondo toca" id="boton-bolsa" type="button" aria-label="Ver tu pedido">
+      <span class="ico" id="ico-bolsa"></span>
+      <span class="bolsa-cuenta num" id="bolsa-cuenta" hidden>0</span>
+    </button>
+  </div>
+  <div class="franja-llama"></div>
+</header>
+
+<section class="portada" aria-labelledby="titulo-portada">
+  <h1 class="solo-lector" id="titulo-portada">Son D'licias, menú y pedidos</h1>
+  <img class="portada-logo" src="img/logo.webp" alt="Son D'licias" width="228" height="166">
+  <p class="portada-lema">Sabores que enamoran, ambiente que inspira</p>
+  <p class="portada-texto">Arma tu pedido aquí y envíalo por WhatsApp. Te respondemos para confirmarlo.</p>
+  <div class="portada-acciones" id="portada-acciones"></div>
+</section>
+
+<nav class="categorias" id="categorias" aria-label="Categorías del menú"></nav>
+
+<div class="disposicion">
+  <main id="menu"></main>
+  <aside class="lateral" aria-label="Tu pedido"><div class="caja" id="pedido-lateral"></div></aside>
+</div>
+
+<button class="barra-pedido toca" id="barra-pedido" type="button" hidden></button>
+<div id="capa"></div>
+<div id="aviso" class="solo-lector" role="status" aria-live="polite"></div>
+
+<noscript><p style="padding:16px;color:#fff">Activa JavaScript para ver el menú y hacer tu pedido.</p></noscript>
+<script type="module" src="js/tienda.js"></script>
+</body>
+</html>

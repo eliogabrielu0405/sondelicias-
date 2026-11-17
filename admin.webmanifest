@@ -1,0 +1,29 @@
+{
+  "name": "Panel Son D'licias",
+  "short_name": "Son D'licias",
+  "description": "Pedidos, caja y finanzas del local",
+  "lang": "es",
+  "start_url": "admin",
+  "scope": "admin",
+  "display": "standalone",
+  "background_color": "#3A0709",
+  "theme_color": "#C8141C",
+  "icons": [
+    {
+      "src": "img/icono-192.png",
+      "sizes": "192x192",
+      "type": "image/png"
+    },
+    {
+      "src": "img/icono-512.png",
+      "sizes": "512x512",
+      "type": "image/png"
+    },
+    {
+      "src": "img/icono-maskable-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "maskable"
+    }
+  ]
+}
