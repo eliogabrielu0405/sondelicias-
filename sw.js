@@ -1,6 +1,6 @@
 /* Panel sin internet: guarda una copia de los archivos del panel en el teléfono.
    Cambia VERSION cuando subas cambios del panel para que los teléfonos tomen lo nuevo. */
-const VERSION = "sd-panel-v1";
+const VERSION = "sd-panel-v10";
 const ARCHIVOS = [
   "admin",
   "menu.js",
@@ -12,6 +12,7 @@ const ARCHIVOS = [
   "js/panel/calculos.js",
   "js/panel/datos.js",
   "js/panel/finanzas.js",
+  "js/panel/impresion.js",
   "js/panel/mas.js",
   "js/panel/negocio.js",
   "js/panel/pedidos.js",

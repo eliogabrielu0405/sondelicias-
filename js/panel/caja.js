@@ -1,16 +1,17 @@
 /* Caja registradora: vender en mostrador y cobrar (también lo usan Pedidos y Por cobrar). */
 import { poner, reemplazar } from "../comun.js";
 import { usd, bs, numero, TIPOS_ENTREGA } from "../comun.js";
-import { h, icono, abrirHoja, avisar, campoMonto, intentar, interruptor, confirmar } from "./ui.js";
+import { h, icono, abrirHoja, avisar, campoMonto, intentar, interruptor, confirmar, fotoProducto } from "./ui.js";
 import { estado } from "./datos.js";
 import { cuentasActivas, tasa, venderEnCaja, productosOrdenados, categoriasOrdenadas, totalDe } from "./negocio.js";
+import { ajustesImpresion, imprimir } from "./impresion.js";
 import * as C from "./calculos.js";
 
 const r2 = (n) => Math.round((Number(n) || 0) * 100) / 100;
 
 /* ───────── Cobro ───────── */
 /* total y yaPagado en $. alConfirmar(pagos) recibe [{cuenta, monto}] en la moneda de cada cuenta ([] = cobrar después). */
-export function abrirCobro({ titulo = "Cobrar", total, yaPagado = 0, permitirDespues = false, alConfirmar, app }) {
+export function abrirCobro({ titulo = "Cobrar", total, yaPagado = 0, permitirDespues = false, alConfirmar, app, preferida }) {
   const saldo = r2(total - yaPagado);
   abrirHoja(titulo, (cuerpo, cerrar) => {
     const pintar = () => {
@@ -63,9 +64,10 @@ export function abrirCobro({ titulo = "Cobrar", total, yaPagado = 0, permitirDes
           h("div", null, "Para cobrar en bolívares pon la tasa de hoy.",
             h("button", { class: "boton mostaza chico toca", type: "button", onclick: () => app?.pedirTasa(pintar) }, "Poner tasa"))) : null,
         h("p", { class: "etiqueta", style: { margin: "16px 0 8px" } }, "Pagó todo con:"),
-        h("div", { class: "formas" }, cuentasActivas().map((c) =>
-          h("button", { class: "forma toca", type: "button", onclick: () => pagarTodo(c) },
-            h("span", null, c.nombre), h("small", { class: "num" }, enMoneda(c, saldo))))),
+        h("div", { class: "formas" }, [...cuentasActivas()].sort((a, b) => (b.id === preferida) - (a.id === preferida)).map((c) =>
+          h("button", { class: `forma toca ${c.id === preferida ? "preferida" : ""}`, type: "button", onclick: () => pagarTodo(c) },
+            h("span", null, c.nombre, c.id === preferida ? h("em", { class: "eligio" }, "Eligió el cliente") : null),
+            h("small", { class: "num" }, enMoneda(c, saldo))))),
         h("details", { style: { marginTop: "14px" } },
           h("summary", { class: "etiqueta", style: { minHeight: "44px", display: "flex", alignItems: "center", cursor: "pointer" } }, "Dividir el pago entre varias formas"),
           h("div", { class: "division", style: { marginTop: "8px" } },
@@ -121,23 +123,42 @@ export function pintar(vista, app) {
   const enTicket = (pid) => ticket.lineas.filter((l) => l.pid === pid).reduce((s, l) => s + l.cant, 0);
 
   const barra = h("button", { class: "barra-ticket toca", type: "button", onclick: () => abrirTicket(app, refrescar) });
+  const emojis = new Map(categoriasOrdenadas().map((c) => [c.id, c.emoji]));
+
+  /* Cada ficha se arma una sola vez y se reutiliza: así las fotos no parpadean al tocar */
+  const fichas = new Map();
+  function ficha(p) {
+    let f = fichas.get(p.id);
+    if (!f) {
+      const cuantos = h("em", { class: "cuantos num", "aria-hidden": "true", hidden: true });
+      const boton = h("button", {
+        class: `pos-producto toca ${p.disponible === false ? "agotado" : ""}`, type: "button",
+        onclick: () => {
+          const linea = { pid: p.id, nombre: p.nombre, precio: p.precio };
+          if (p.opciones?.length) elegirOpcion(p, (op) => { agregar(linea, op); refrescar(); });
+          else { agregar(linea, ""); refrescar(); }
+        },
+      },
+      fotoProducto(p, { clase: "pos-foto", sizes: "(min-width: 900px) 220px, (min-width: 600px) 33vw, 50vw", emoji: emojis.get(p.cat) }),
+      h("span", { class: "pos-texto" },
+        h("b", null, p.nombre),
+        h("span", { class: "pos-precio num" }, p.disponible === false ? "Agotado" : usd(p.precio))),
+      cuantos);
+      f = { boton, cuantos };
+      fichas.set(p.id, f);
+    }
+    const n = enTicket(p.id);
+    f.cuantos.hidden = !n;
+    f.cuantos.textContent = String(n);
+    f.boton.setAttribute("aria-label", `${p.nombre}, ${usd(p.precio)}${n ? `, ${n} en el ticket` : ""}${p.disponible === false ? ", agotado" : ""}`);
+    return f.boton;
+  }
+
   function refrescar() {
     const q = filtro.texto.trim().toLowerCase();
     reemplazar(grid, ...productos
       .filter((p) => (!filtro.cat || p.cat === filtro.cat) && (!q || p.nombre.toLowerCase().includes(q)))
-      .map((p) => {
-        const n = enTicket(p.id);
-        return h("button", {
-          class: `pos-producto toca ${p.disponible === false ? "agotado" : ""}`, type: "button",
-          "aria-label": `${p.nombre}, ${usd(p.precio)}${n ? `, ${n} en el ticket` : ""}${p.disponible === false ? ", agotado" : ""}`,
-          onclick: () => {
-            const linea = { pid: p.id, nombre: p.nombre, precio: p.precio };
-            if (p.opciones?.length) elegirOpcion(p, (op) => { agregar(linea, op); refrescar(); });
-            else { agregar(linea, ""); refrescar(); }
-          },
-        }, h("b", null, p.nombre), h("span", { class: "num" }, p.disponible === false ? "Agotado" : usd(p.precio)),
-        n ? h("em", { class: "cuantos num", "aria-hidden": "true" }, String(n)) : null);
-      }));
+      .map(ficha));
     const n = cuentaTicket();
     barra.hidden = n === 0;
     reemplazar(barra, h("span", { style: { display: "inline-flex", gap: "8px", alignItems: "center" } }, icono("recibo", 22), `Ticket (${n})`), h("span", { class: "num" }, usd(totalDe(ticket.lineas))));
@@ -180,16 +201,23 @@ function abrirTicket(app, alCambiar) {
       nota.addEventListener("input", () => { ticket.nota = nota.value; guardarTicket(); });
       const lineaNombre = (l) => (l.opcion ? `${l.nombre} (${l.opcion})` : l.nombre);
 
+      const aj = ajustesImpresion();
       const vender = async (pagos) => {
-        const v = await venderEnCaja({ items: ticket.lineas.map((l) => ({ ...l })), cliente: ticket.cliente, tipo: ticket.tipo, nota: ticket.nota, pagos, cocina: ticket.cocina });
-        Object.assign(ticket, { lineas: [], cliente: "", nota: "" });
+        const v = await venderEnCaja({
+          items: ticket.lineas.map((l) => ({ ...l })), cliente: ticket.cliente, tipo: ticket.tipo, nota: ticket.nota, pagos, cocina: ticket.cocina,
+          factura: aj.facturas ? ticket.factura : "",
+        });
+        Object.assign(ticket, { lineas: [], cliente: "", nota: "", factura: "" });
         guardarTicket();
         cerrar();
         alCambiar();
         app.refrescar();
         const debe = C.saldo(v);
         avisar(debe > 0.004 ? `Venta #${v.num} guardada. Debe ${usd(debe)}` : `Venta #${v.num} cobrada`);
+        if (v.fase === "cocina" && aj.comandaAuto) imprimir("comanda", v);
       };
+      const factura = h("input", { class: "campo num", id: "t-factura", inputmode: "numeric", autocomplete: "off", value: ticket.factura || "", maxLength: 20, placeholder: "Opcional" });
+      factura.addEventListener("input", () => { ticket.factura = factura.value; guardarTicket(); });
 
       reemplazar(cuerpo, 
         h("ul", { class: "ticket-lineas" }, ticket.lineas.map((l) => h("li", null,
@@ -204,6 +232,7 @@ function abrirTicket(app, alCambiar) {
           h("div", null, h("p", { class: "etiqueta" }, "Tipo"), h("div", { class: "chips" }, Object.values(TIPOS_ENTREGA).map((t) =>
             h("button", { class: "chip toca", type: "button", "aria-pressed": String(ticket.tipo === t), onclick: () => { ticket.tipo = t; guardarTicket(); pintar(); } }, t)))),
           h("div", null, h("label", { class: "etiqueta", for: "t-nota" }, "Nota para la cocina"), nota),
+          aj.facturas ? h("div", null, h("label", { class: "etiqueta", for: "t-factura" }, "N° de factura fiscal"), factura) : null,
           h("div", { style: { display: "flex", alignItems: "center", justifyContent: "space-between", gap: "12px" } },
             h("span", { class: "etiqueta", style: { margin: 0 } }, "Enviar a cocina"),
             interruptor(ticket.cocina, (v) => { ticket.cocina = v; guardarTicket(); }, "Enviar a cocina")),

@@ -1,0 +1,66 @@
+/* Adornos de Navidad. Este archivo solo se carga en temporada (lo pide js/navidad.js). */
+
+/* El espacio para las luces ya está reservado en tienda.css (clase .navidad puesta antes de pintar) */
+
+/* ── Luces: un cable con bombillos que titilan ── */
+.luces {
+  position: absolute; left: 0; right: 0; top: 100%; z-index: 1; height: 24px; overflow: hidden; pointer-events: none;
+  background: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='44' height='14'%3E%3Cpath d='M0 1 Q22 13 44 1' fill='none' stroke='%232B1A12' stroke-width='1.6'/%3E%3C/svg%3E") repeat-x 0 0 / 44px 14px;
+}
+.foco { position: absolute; top: 5px; width: 9px; height: 15px; margin-left: -4.5px; transform: rotate(var(--g)); transform-origin: 50% 0; }
+.foco::before { content: ""; position: absolute; top: 0; left: 2px; width: 5px; height: 4px; border-radius: 1px; background: #4A3B2A; }
+.foco::after {
+  content: ""; position: absolute; top: 3px; left: 0; width: 9px; height: 12px;
+  border-radius: 45% 45% 50% 50% / 35% 35% 65% 65%;
+  background: radial-gradient(circle at 35% 30%, rgba(255, 255, 255, 0.85) 0 12%, var(--c) 40%);
+  box-shadow: 0 0 7px 1px var(--c);
+  animation: titilar var(--t) ease-in-out var(--r) infinite;
+}
+@keyframes titilar { 0%, 100% { opacity: 1; } 50% { opacity: 0.35; } }
+
+/* ── Portada: nieve suave y esferas colgando ── */
+.navidad .portada-contenido { position: relative; z-index: 1; }
+.nieve { position: absolute; inset: 0; z-index: 0; overflow: hidden; pointer-events: none; }
+.copo {
+  position: absolute; top: -14px; left: var(--x); width: var(--s); height: var(--s); border-radius: 50%;
+  background: radial-gradient(circle, #fff 55%, rgba(255, 255, 255, 0) 72%); opacity: var(--o);
+  animation: caer var(--d) linear var(--r) infinite;
+}
+.copo.estrella { width: auto; height: auto; background: none; color: #fff; font-size: var(--s); line-height: 1; }
+@keyframes caer {
+  0% { transform: translate3d(0, 0, 0) rotate(0deg); }
+  50% { transform: translate3d(var(--dx), 180px, 0) rotate(180deg); }
+  100% { transform: translate3d(0, 360px, 0) rotate(360deg); }
+}
+
+.esferas { position: absolute; top: 0; left: 14px; z-index: 2; display: none; align-items: flex-start; gap: 10px; pointer-events: none; }
+.esfera { display: flex; flex-direction: column; align-items: center; width: 22px; transform-origin: 50% 0; animation: columpio var(--t) ease-in-out var(--r) infinite alternate; }
+.esfera::before { content: ""; width: 1.5px; height: var(--l); background: rgba(255, 222, 160, 0.8); }
+.esfera b {
+  position: relative; width: var(--s); height: var(--s); margin-top: 3px; border-radius: 50%;
+  background: var(--c);
+  background: radial-gradient(circle at 34% 30%, #fff 0 9%, var(--c) 34%, color-mix(in srgb, var(--c) 70%, #000) 100%);
+  box-shadow: 0 3px 6px rgba(0, 0, 0, 0.35);
+}
+.esfera b::before { content: ""; position: absolute; top: -4px; left: 50%; width: 7px; height: 5px; margin-left: -3.5px; border-radius: 2px; background: linear-gradient(#F6D365, #B8862A); }
+@keyframes columpio { from { transform: rotate(-8deg); } to { transform: rotate(8deg); } }
+/* En el teléfono y la tablet la portada compacta no tiene espacio libre: las esferas cuelgan solo en computadora */
+@media (min-width: 1024px) {
+  .esferas { display: flex; left: auto; right: 56px; gap: 22px; }
+  .esfera { width: 28px; }
+  .esfera::before { height: calc(var(--l) * 1.4); }
+  .esfera b { width: calc(var(--s) * 1.35); height: calc(var(--s) * 1.35); }
+}
+
+/* ── Gorro navideño en el logo de la cabecera y en la hamburguesa bailarina ── */
+.navidad .insignia { position: relative; overflow: visible; }
+.gorro-insignia { position: absolute; top: -13px; left: -9px; z-index: 2; width: 30px; transform: rotate(-24deg); pointer-events: none; filter: drop-shadow(0 2px 2px rgba(0, 0, 0, 0.25)); }
+.gorro-insignia svg { display: block; width: 100%; height: auto; }
+.navidad .hb-gorro { display: inline; }
+
+/* Mensaje festivo al enviar el pedido */
+.mensaje-fiestas { margin-top: 2px; padding: 8px 12px; border-radius: 12px; background: #FDECEC; color: var(--rojo-hondo); font-size: 14px; font-weight: 600; }
+
+@media (prefers-reduced-motion: reduce) {
+  .nieve { display: none; }
+}

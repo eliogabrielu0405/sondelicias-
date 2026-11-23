@@ -1,5 +1,5 @@
 /* Operaciones del negocio: pedidos, ventas, cobros, inventario, gastos y dinero. */
-import { CATEGORIAS, PRODUCTOS, VERSION_MENU } from "../../menu.js";
+import { CATEGORIAS, PRODUCTOS, VERSION_MENU, PAGOS } from "../../menu.js";
 import { estado, guardar, guardarJuntos, config, ponerConfig, nuevoId } from "./datos.js";
 import * as C from "./calculos.js";
 
@@ -11,14 +11,24 @@ export const CUENTAS_INICIALES = [
   { id: "pago-movil", nombre: "Pago Móvil", moneda: "VES", activa: true },
   { id: "punto", nombre: "Punto de venta", moneda: "VES", activa: true },
   { id: "zelle", nombre: "Zelle", moneda: "USD", activa: true },
+  { id: "binance", nombre: "Binance", moneda: "USD", activa: true },
+  { id: "biopago", nombre: "Biopago", moneda: "VES", activa: true },
 ];
+const CUENTAS_AGREGADAS = ["binance", "biopago"]; // se suman también a paneles que ya tenían sus formas guardadas
 export const CATEGORIAS_GASTO = [
   "Sueldos y pagos al personal", "Alquiler", "Luz, agua, gas e internet", "Delivery y transporte",
   "Empaques y desechables", "Mantenimiento y reparaciones", "Publicidad", "Impuestos y permisos",
   "Comisiones bancarias", "Otros",
 ];
 
-export const cuentas = () => config("cuentas", CUENTAS_INICIALES);
+export const cuentas = () => {
+  const guardadas = config("cuentas", null);
+  if (!guardadas) return CUENTAS_INICIALES;
+  const faltan = CUENTAS_INICIALES.filter((c) => CUENTAS_AGREGADAS.includes(c.id) && !guardadas.some((g) => g.id === c.id));
+  return faltan.length ? [...guardadas, ...faltan] : guardadas;
+};
+/* Forma de pago que eligió el cliente en la página → su nombre y la cuenta del panel */
+export const pagoElegido = (id) => PAGOS.find((f) => f.id === id) || null;
 export const cuentasActivas = () => cuentas().filter((c) => c.activa !== false);
 export const cuentaPorId = (id) => cuentas().find((c) => c.id === id);
 export const nombreCuenta = (id) => cuentaPorId(id)?.nombre || id || "Sin cuenta";
@@ -115,6 +125,7 @@ export async function importarPedido(datos) {
   const venta = {
     id: nuevoId("v"), num, creado: Date.now(), origen: "web", estado: "pendiente", fase: null,
     codigo: datos.codigo, cliente: datos.cliente, tipo: datos.tipo, direccion: datos.direccion, nota: datos.nota,
+    pago: pagoElegido(datos.pago) ? datos.pago : "",
     items, total: totalDe(items), totalVisto: datos.totalVisto, enviado: datos.enviado, pagos: [],
   };
   await guardarJuntos([["ventas", venta], ["config", { clave: "contador", valor: num }]]);
@@ -166,13 +177,16 @@ export async function confirmarPedido(venta, { fase = "cocina", pagos = [] } = {
 }
 
 /* Venta de mostrador: se crea y se confirma de una vez */
-export async function venderEnCaja({ items, cliente, tipo, nota, pagos, cocina }) {
+export async function venderEnCaja({ items, cliente, tipo, nota, pagos, cocina, factura }) {
   if (!items.length) throw new Error("No hay productos en la venta.");
   const num = siguienteNumero();
+  const nFactura = limpiarFactura(factura);
+  if (nFactura) revisarFacturaRepetida(nFactura, null);
   const borrador = {
     id: nuevoId("v"), num, creado: Date.now(), origen: "caja", estado: "pendiente", fase: null,
     cliente: (cliente || "").trim() || "Mostrador", tipo: tipo || "Para llevar", direccion: "", nota: nota || "",
     items: items.map((it) => ({ ...it, costo: null })), total: totalDe(items), pagos: [],
+    ...(nFactura ? { factura: nFactura } : {}),
   };
   const { confirmada, cambios } = cambiosAlConfirmar(borrador, cocina ? "cocina" : "entregada");
   confirmada.pagos = armarPagos(pagos, confirmada.total);
@@ -198,6 +212,22 @@ export async function registrarCobro(venta, pagos) {
   if (!actual || actual.estado !== "confirmada") throw new Error("No se puede cobrar: esa venta no está confirmada.");
   const nuevos = armarPagos(pagos, C.saldo(actual));
   await guardar("ventas", { ...actual, pagos: [...(actual.pagos || []), ...nuevos] });
+}
+
+/* Número de la factura fiscal (de la máquina fiscal) anotado en la venta, para cuadrar el día */
+const limpiarFactura = (n) => String(n ?? "").replace(/[^0-9A-Za-z-]/g, "").slice(0, 20);
+function revisarFacturaRepetida(numero, ventaId) {
+  const otra = estado.ventas.find((v) => v.id !== ventaId && v.estado === "confirmada" && v.factura === numero);
+  if (otra) throw new Error(`Ese número de factura ya está anotado en la venta #${otra.num}.`);
+}
+export async function guardarFactura(venta, numero) {
+  const actual = estado.ventas.find((v) => v.id === venta.id);
+  if (!actual) throw new Error("No se encontró esa venta.");
+  const n = limpiarFactura(numero);
+  if (n) revisarFacturaRepetida(n, actual.id);
+  const { factura: _anterior, ...resto } = actual;
+  await guardar("ventas", n ? { ...resto, factura: n } : resto);
+  return n;
 }
 
 export async function cancelarPedido(venta) {
@@ -290,9 +320,11 @@ export async function movimientoCaja({ tipo, cuenta, monto, cuentaDestino, monto
   await guardar("caja", mov(cuenta, signo * Math.abs(monto)));
 }
 
-export async function guardarCierre({ fecha, filas, nota, ajustar }) {
+export async function guardarCierre({ fecha, filas, nota, ajustar, reporteZ }) {
   const ahora = Date.now();
-  const cambios = [["cierres", { fecha, filas, nota: (nota || "").trim(), creado: ahora }]];
+  const cierre = { fecha, filas, nota: (nota || "").trim(), creado: ahora };
+  if (reporteZ?.bs > 0) cierre.reporteZ = { bs: r2(reporteZ.bs), panelBs: r2(reporteZ.panelBs || 0) };
+  const cambios = [["cierres", cierre]];
   if (ajustar) {
     for (const f of filas) {
       const dif = r2(f.contado - f.esperado);

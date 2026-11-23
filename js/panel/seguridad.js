@@ -61,7 +61,7 @@ export async function cambiarClave(actual, nueva) {
 export function pantallaEntrada(contenedor, listo) {
   const tarjeta = h("div", { class: "entrada caja" });
   reemplazar(contenedor, h("div", { class: "entrada-fondo" },
-    h("img", { class: "entrada-logo", src: "img/logo.webp", alt: NEGOCIO.nombre, width: 228, height: 166 }),
+    h("img", { class: "entrada-logo", src: "img/logo.webp", alt: NEGOCIO.nombre, width: 228, height: 168 }),
     tarjeta));
 
   const mensaje = h("p", { class: "falta", role: "alert" });

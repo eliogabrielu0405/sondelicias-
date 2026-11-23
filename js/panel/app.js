@@ -48,7 +48,7 @@ function cabecera() {
     t ? `Tasa ${numero(t.valor)}${t.deHoy ? "" : " (vieja)"}` : "Poner tasa");
   return h("header", { class: "p-cabecera" },
     h("div", { class: "p-cabecera-fila" },
-      h("div", { class: "insignia" }, h("img", { src: "img/logo.webp", alt: "", width: 228, height: 166 })),
+      h("div", { class: "insignia" }, h("img", { src: "img/logo.webp", alt: "", width: 228, height: 168 })),
       h("div", { class: "p-titulo" }, h("b", null, "Panel"), h("span", null, NEGOCIO.nombre)),
       chip,
       h("button", { class: "redondo toca", type: "button", "aria-label": "Bloquear el panel", onclick: () => app.bloquear() }, icono("candado", 20)),
