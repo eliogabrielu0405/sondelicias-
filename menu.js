@@ -40,12 +40,12 @@ const SALCHICHA = ["Salchicha de pollo", "Polaca"];
 
 export const CATEGORIAS = [
   { id: "hamburguesas", nombre: "Hamburguesas", emoji: "🍔", foto: "img/fotos/hamburguesas-2.webp" },
-  { id: "perros", nombre: "Perros calientes", corto: "Perros", emoji: "🌭", foto: "img/fotos/perros.webp" },
-  { id: "pepitos", nombre: "Pepitos", emoji: "🥖", foto: "img/fotos/pepitos.webp" },
-  { id: "sandwiches", nombre: "Sándwich y Club House", corto: "Sándwiches", emoji: "🥪", foto: "img/fotos/sandwiches.webp" },
-  { id: "salchipapas", nombre: "Salchipapas", emoji: "🍟", foto: "img/fotos/salchipapas.webp" },
-  { id: "raciones", nombre: "Papas y tequeños", corto: "Raciones", emoji: "🥔", foto: "img/fotos/raciones.webp" },
-  { id: "adicionales", nombre: "Adicionales", emoji: "🥓", foto: "img/fotos/adicionales.webp", nota: "Al agregar cualquier producto puedes sumarle adicionales. Si los pides sueltos aquí, dinos en las notas a qué producto van." },
+  { id: "perros", nombre: "Perros calientes", corto: "Perros", emoji: "🌭", foto: "img/fotos/perros-2.webp" },
+  { id: "pepitos", nombre: "Pepitos", emoji: "🥖", foto: "img/fotos/pepitos-2.webp" },
+  { id: "sandwiches", nombre: "Sándwich y Club House", corto: "Sándwiches", emoji: "🥪", foto: "img/fotos/sandwiches-2.webp" },
+  { id: "salchipapas", nombre: "Salchipapas", emoji: "🍟", foto: "img/fotos/salchipapas-2.webp" },
+  { id: "raciones", nombre: "Papas y tequeños", corto: "Raciones", emoji: "🥔", foto: "img/fotos/raciones-2.webp" },
+  { id: "adicionales", nombre: "Adicionales", emoji: "🥓", foto: "img/fotos/adicionales-2.webp", nota: "Al agregar cualquier producto puedes sumarle adicionales. Si los pides sueltos aquí, dinos en las notas a qué producto van." },
 ];
 
 /* Formas de pago que el cliente elige al pedir.
