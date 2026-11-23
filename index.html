@@ -2,7 +2,7 @@
 <html lang="es">
 <head>
 <meta charset="utf-8">
-<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover,interactive-widget=resizes-content">
 <title>Son D'licias | Menú y pedidos por WhatsApp</title>
 <meta name="description" content="Menú de Son D'licias en Calabozo: hamburguesas, perros calientes, pepitos, club house y salchipapas. Arma tu pedido y envíalo por WhatsApp.">
 <meta name="theme-color" content="#C8141C">
@@ -11,54 +11,108 @@
 <meta property="og:title" content="Son D'licias | Menú y pedidos por WhatsApp">
 <meta property="og:description" content="Sabores que enamoran, ambiente que inspira. Arma tu pedido y envíalo por WhatsApp.">
 <meta property="og:url" content="https://sondelicias.vercel.app/">
-<meta property="og:image" content="https://sondelicias.vercel.app/img/compartir.jpg">
+<meta property="og:image" content="https://sondelicias.vercel.app/img/compartir.jpg?v=2">
 <meta property="og:image:width" content="1200">
 <meta property="og:image:height" content="630">
 <meta property="og:image:alt" content="Logo de Son D'licias">
 <meta name="twitter:card" content="summary_large_image">
-<meta name="twitter:image" content="https://sondelicias.vercel.app/img/compartir.jpg">
+<meta name="twitter:image" content="https://sondelicias.vercel.app/img/compartir.jpg?v=2">
+<meta name="apple-mobile-web-app-title" content="Son D'licias">
+<meta name="application-name" content="Son D'licias">
 <link rel="icon" href="img/favicon.png" type="image/png">
 <link rel="apple-touch-icon" href="img/apple-touch-icon.png">
 <link rel="preload" href="fonts/poppins-700.woff" as="font" type="font/woff" crossorigin>
 <link rel="stylesheet" href="css/comun.css">
 <link rel="stylesheet" href="css/tienda.css">
+<!-- Los scripts se piden juntos (después de los estilos) para que el menú aparezca antes -->
+<link rel="modulepreload" href="js/tienda.js">
+<link rel="modulepreload" href="js/comun.js">
+<link rel="modulepreload" href="menu.js">
+<link rel="modulepreload" href="js/bailarina.js">
+<link rel="modulepreload" href="js/navidad.js">
+<script>
+/* Temporada navideña (15 nov – 6 ene, hora de Venezuela): se marca antes de pintar para que nada salte.
+   js/navidad.js luego respeta NAVIDAD de menu.js (puede quitarla o forzarla). */
+(function () {
+  try {
+    var p = new Intl.DateTimeFormat("en-US", { timeZone: "America/Caracas", month: "numeric", day: "numeric" }).formatToParts(new Date());
+    var m = 0, d = 0;
+    for (var i = 0; i < p.length; i++) { if (p[i].type === "month") m = +p[i].value; if (p[i].type === "day") d = +p[i].value; }
+    if ((m === 11 && d >= 15) || m === 12 || (m === 1 && d <= 6)) document.documentElement.classList.add("navidad");
+  } catch (e) { /* sin adornos */ }
+})();
+</script>
 </head>
 <body class="tienda">
 <header class="cabecera" id="cabecera">
   <div class="cabecera-fila">
-    <div class="insignia"><img src="img/logo.webp" alt="" width="228" height="166"></div>
+    <div class="insignia"><img src="img/logo-360.webp" alt="" width="360" height="265"></div>
     <div class="marca">
       <p class="marca-nombre">Son D'licias</p>
-      <p class="marca-lema">Menú y pedidos por WhatsApp</p>
+      <span class="estado-horario chico" data-horario role="status"></span>
     </div>
-    <button class="bolsa redondo toca" id="boton-bolsa" type="button" aria-label="Ver tu pedido">
-      <span class="ico" id="ico-bolsa"></span>
+    <button class="icono-boton" id="boton-buscar" type="button" aria-label="Buscar en el menú"><span class="ico" data-ico="buscar" data-tam="20"></span></button>
+    <button class="icono-boton bolsa" id="boton-bolsa" type="button" aria-label="Ver tu pedido">
+      <span class="ico" data-ico="bolsa" data-tam="22"></span>
       <span class="bolsa-cuenta num" id="bolsa-cuenta" hidden>0</span>
     </button>
   </div>
-  <div class="franja-llama"></div>
 </header>
 
 <section class="portada" aria-labelledby="titulo-portada">
   <h1 class="solo-lector" id="titulo-portada">Son D'licias, menú y pedidos</h1>
-  <img class="portada-logo" src="img/logo.webp" alt="Son D'licias" width="228" height="166">
-  <p class="portada-lema">Sabores que enamoran, ambiente que inspira</p>
-  <p class="portada-texto">Arma tu pedido aquí y envíalo por WhatsApp. Te respondemos para confirmarlo.</p>
-  <div class="portada-acciones" id="portada-acciones"></div>
+  <div class="portada-tarjeta">
+    <picture>
+      <source media="(max-width: 719px)" srcset="img/fotos/hamburguesas-720.webp">
+      <img class="portada-fondo" src="img/fotos/hamburguesas.webp" alt="" fetchpriority="high">
+    </picture>
+    <div class="portada-contenido">
+      <img class="portada-logo" src="img/logo-360.webp" alt="Son D'licias" width="360" height="265">
+      <div class="portada-texto">
+        <p class="portada-lema">Sabores que enamoran, ambiente que inspira</p>
+        <p class="estado-portada" id="estado-portada"></p>
+        <p class="horario-semana" id="horario-semana"><span class="ico" data-ico="reloj" data-tam="14"></span><span id="horario-semana-texto">Mar a Dom: 6:00 pm – 11:00 pm</span></p>
+      </div>
+      <div class="portada-acciones">
+        <a class="pastilla" id="accion-telefono" href="tel:+584141445118"><span class="ico" data-ico="telefono" data-tam="16"></span><span id="accion-telefono-texto">0414-1445118</span></a>
+        <a class="pastilla" id="accion-instagram" href="https://www.instagram.com/son.dliciascalabozo/" rel="noopener" aria-label="Instagram de Son D'licias"><span class="ico" data-ico="instagram" data-tam="16"></span><span class="pastilla-texto">Instagram</span></a>
+        <span class="ranura-bailarina" id="ranura-bailarina" aria-hidden="true"></span>
+      </div>
+    </div>
+  </div>
 </section>
+
+<div class="buscador" role="search">
+  <label class="buscador-campo">
+    <span class="ico" data-ico="buscar" data-tam="20"></span>
+    <span class="solo-lector">Buscar en el menú</span>
+    <input id="buscar" type="search" placeholder="Busca hamburguesa, perro, tequeños…" autocomplete="off" enterkeyhint="search">
+    <button class="buscador-limpiar" id="buscar-limpiar" type="button" aria-label="Borrar búsqueda" hidden><span class="ico" data-ico="x" data-tam="18"></span></button>
+  </label>
+</div>
 
 <nav class="categorias" id="categorias" aria-label="Categorías del menú"></nav>
 
 <div class="disposicion">
-  <main id="menu"></main>
-  <aside class="lateral" aria-label="Tu pedido"><div class="caja" id="pedido-lateral"></div></aside>
+  <main id="menu">
+    <p class="resultado-busqueda" id="resultado-busqueda" role="status" hidden></p>
+    <div class="esqueleto" id="esqueleto" aria-hidden="true">
+      <span class="esq esq-titulo"></span>
+      <div class="esq-carril"><span class="esq esq-destacado"></span><span class="esq esq-destacado"></span><span class="esq esq-destacado"></span></div>
+      <span class="esq esq-franja"></span>
+      <span class="esq esq-tarjeta"></span>
+      <span class="esq esq-tarjeta"></span>
+      <span class="esq esq-tarjeta"></span>
+    </div>
+  </main>
+  <aside class="lateral" aria-label="Tu pedido"><div class="lateral-caja" id="pedido-lateral"></div></aside>
 </div>
 
-<button class="barra-pedido toca" id="barra-pedido" type="button" hidden></button>
+<button class="barra-pedido" id="barra-pedido" type="button" aria-label="Tu pedido está vacío"></button>
 <div id="capa"></div>
 <div id="aviso" class="solo-lector" role="status" aria-live="polite"></div>
 
-<noscript><p style="padding:16px;color:#fff">Activa JavaScript para ver el menú y hacer tu pedido.</p></noscript>
+<noscript><p style="padding:16px">Activa JavaScript para ver el menú y hacer tu pedido.</p></noscript>
 <script type="module" src="js/tienda.js"></script>
 </body>
 </html>

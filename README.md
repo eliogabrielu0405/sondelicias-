@@ -43,7 +43,7 @@ No usa base de datos ni servidor. Todo lo del panel se guarda en el teléfono do
 - **Caja**: ventas en el mostrador. Toca los productos, abre el ticket y cobra. **Cobrar después** deja la venta en **Por cobrar**.
 - **Productos**: precios, agotados (interruptor), costos y receta con insumos (opcional). En **Inventario** se anotan compras, usos o mermas y conteos.
 - **Finanzas**: reportes por día, semana y mes; **Meses** (tabla comparativa); **Resultados** (estado de resultados del mes, para imprimir o compartir); **Márgenes** por producto.
-- **Más**: gastos, dinero en cuentas, por cobrar, cierre de caja, historial (con anulación de ventas), formas de pago, copia de seguridad y contraseña.
+- **Más**: gastos, dinero en cuentas, por cobrar, cierre de caja, historial (con anulación de ventas), formas de pago, impresora y factura fiscal, copia de seguridad y contraseña.
 - El día del negocio va de 4:00 a. m. a 4:00 a. m.: lo vendido después de medianoche cuenta en la noche anterior.
 
 ## Importante: los datos viven en un solo teléfono
@@ -58,8 +58,51 @@ No usa base de datos ni servidor. Todo lo del panel se guarda en el teléfono do
 - Al abrirse, el panel toma los precios nuevos de la página, salvo los que el local cambió a mano.
 - Si el local cambia un precio en el panel, la caja ya cobra con ese precio, pero la página sigue igual hasta que se actualice `menu.js`. El panel muestra un aviso con el botón **Pedir el cambio por WhatsApp**, que escribe a soporte con la lista.
 - No cambies el `id` de un producto ya publicado: viaja en los enlaces de los pedidos.
+- **Lo más pedido** (carrusel de arriba) y **Te puede gustar** (sugerencias dentro del pedido) se cambian en `DESTACADOS` y `SUGERENCIAS` de `menu.js`, poniendo los `id` de los productos.
+- **Horario**: se cambia en `HORARIO` de `menu.js` (días, hora de abrir y de cerrar).
+- **Adornos de Navidad** (luces, nieve, esferas y gorro): `NAVIDAD` en `menu.js`. Con `"auto"` aparecen solos del 15 de noviembre al 6 de enero; `true` los deja siempre y `false` los quita.
+- La **hamburguesa bailarina** junto a Instagram está en `js/bailarina.js`.
 - Fotos de productos: ponlas en `img/productos/` (en webp) y agrega `foto: "img/productos/h3.webp"` al producto en `menu.js`.
+  - Para que cargue rápido en teléfonos, cada foto tiene además una versión chica de 240 px con el mismo nombre terminado en `-240.webp` (ej. `h3-240.webp`). Si una foto nueva no la tiene, la página usa la grande sin problema (solo gasta un poco más de datos).
+  - Las fotos de categoría (`img/fotos/`) tienen una versión de 720 px terminada en `-720.webp`.
 - Si cambias archivos del panel, cambia también `VERSION` en `sw.js` (por ejemplo `sd-panel-v2`) para que los teléfonos tomen lo nuevo.
+
+## Formas de pago
+
+Se cambian en `PAGOS` de `menu.js`. Hoy: **delivery** con Zelle, Binance o Pago Móvil; **para llevar y comer aquí** además con Tarjeta y Biopago. El cliente elige una al pedir (es obligatorio), sale en el mensaje de WhatsApp y en el pedido del panel, y al cobrar esa forma aparece primero. En el panel, las que no uses se apagan en **Más → Formas de pago**.
+
+## Cambiar precios (panel → Productos → Ajustar precios)
+
+- **Ajuste rápido**: sube o baja varios precios a la vez (por porcentaje, por monto en $ o por el margen que quieres ganar), para todo el menú o una categoría, con redondeo. Nada se guarda hasta que tocas **Guardar**, y el último ajuste se puede **deshacer**.
+- En la misma lista se escriben los **costos** de cada producto, y el margen se ve al momento.
+- La caja cobra con los precios nuevos apenas se guardan. Para que **la página de pedidos** también los tenga (y los productos **agotados**), toca **Descargar menu.js** y reemplaza el `menu.js` de la página (en GitHub o Vercel). Si no, usa **Pedir el cambio por WhatsApp**.
+
+## Fotos en el panel
+
+La **Caja** y **Productos** muestran la misma foto que la página (versión chica de 240 px). Los productos sin foto llevan el emoji de su categoría. Para cambiar o poner una foto, en **Productos** toca el producto → **Cambiar foto** (o **Enviar foto**): abre el WhatsApp de soporte con el mensaje listo, porque las fotos viven en la página.
+
+## Imprimir comanda y ticket
+
+- **Comanda** (para la cocina): número grande, tipo de pedido en recuadro, productos en letra grande con su opción y adicionales debajo, y la nota destacada. Sin precios.
+- **Ticket del cliente**: productos con precio, total en $ y en Bs (con la tasa de la venta), forma de pago y, si se anotó, el número de factura fiscal.
+- Se imprime desde la tarjeta del pedido (**Imprimir**) o desde **Más → Historial** (toca la venta → **Imprimir**).
+- **Más → Impresora y factura fiscal**: papel de 58 u 80 mm, **Imprimir la comanda al aceptar** (también al vender en caja con «Enviar a cocina») e **Imprimir una prueba**.
+- Impresora térmica Bluetooth o USB con Android: instala **RawBT** (o la app de la impresora) y actívala como servicio de impresión; al tocar Imprimir elige esa impresora y el papel. En computadora: elige la impresora, márgenes «Ninguno» y sin encabezados. El navegador siempre muestra la ventana de imprimir (no puede imprimir a escondidas).
+
+## Factura fiscal
+
+El panel **no emite facturas fiscales**: no sustituye la máquina fiscal ni un medio de facturación autorizado por el SENIAT. Por eso todo lo que imprime dice **«Documento no fiscal · No válido como factura»**. Lo que sí hace:
+
+- Con **Anotar el número de factura fiscal** encendido (Más → Impresora y factura fiscal), cada venta confirmada tiene el botón **Anotar factura** y la caja trae el campo **N° de factura fiscal**. No deja anotar el mismo número en dos ventas.
+- En **Cierre de caja**, la tarjeta **Cuadre con la máquina fiscal** muestra lo vendido hoy en Bs (con la tasa de cada venta), compara con el total del **Reporte Z** y lista las ventas de hoy sin número de factura, con **Anotar** al lado. El Reporte Z queda guardado con el cierre.
+
+## Pensada para pedir desde el teléfono
+
+- Carga liviana: fotos en versión chica para teléfonos, logo de 25 KB, esqueleto gris mientras llega el menú y nada se mueve mientras carga.
+- El botón **Atrás** del teléfono cierra la ventana abierta (producto, pedido) en vez de salir de la página.
+- Con el teclado abierto, el formulario de entrega se acomoda y el botón de WhatsApp sigue a la vista.
+- **Repetir el último pedido**: quien ya pidió ve "¿Lo mismo de la última vez?" y lo carga con un toque (se guarda solo en su teléfono).
+- Con "ahorro de datos" activado en el teléfono, las fotos decorativas de las categorías no se bajan.
 
 ## Probarla en la computadora
 

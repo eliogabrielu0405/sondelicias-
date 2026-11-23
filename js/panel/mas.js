@@ -3,7 +3,7 @@ import { poner, reemplazar } from "../comun.js";
 import { usd, bs, numero, enMarco } from "../comun.js";
 import { NEGOCIO } from "../../menu.js";
 import {
-  h, icono, abrirHoja, avisar, intentar, confirmar, interruptor, campoMonto, campoTexto, selector, tituloSeccion, fechaHora, descargar, vacio,
+  h, icono, abrirHoja, avisar, intentar, confirmar, interruptor, campoMonto, campoTexto, selector, segmento, tituloSeccion, fechaHora, descargar, vacio,
 } from "./ui.js";
 import { estado, config, ponerConfig, copiaCompleta, restaurarCopia, protegerAlmacenamiento, borrar } from "./datos.js";
 import {
@@ -12,6 +12,7 @@ import {
 } from "./negocio.js";
 import { cambiarClave } from "./seguridad.js";
 import { abrirCobro } from "./caja.js";
+import { ajustesImpresion, cambiarImpresion, imprimir, abrirImpresion, ventaDePrueba, botonFactura, editarFactura, ventasSinFactura } from "./impresion.js";
 import * as C from "./calculos.js";
 
 let seccion = null;
@@ -31,6 +32,7 @@ const SECCIONES = [
   { id: "cierre", texto: "Cierre de caja", detalle: "Contar el dinero al final del día", icono: "caja", pintar: pintarCierre },
   { id: "historial", texto: "Historial de ventas", detalle: "Buscar, cobrar o anular una venta", icono: "buscar", pintar: pintarHistorial },
   { id: "formas", texto: "Formas de pago", detalle: "Efectivo, Pago Móvil, punto, Zelle…", icono: "billetera", pintar: pintarFormas },
+  { id: "impresion", texto: "Impresora y factura fiscal", detalle: "Comanda, ticket y número de factura", icono: "imprimir", pintar: pintarImpresion },
   { id: "copia", texto: "Copia de seguridad", detalle: "Guardar o recuperar todos los datos", icono: "descargar", pintar: pintarCopia },
   { id: "clave", texto: "Contraseña", detalle: "Cambiar la contraseña del panel", icono: "candado", pintar: pintarClave },
 ];
@@ -251,7 +253,8 @@ function pintarCierre(vista, app) {
   });
   const ajustar = { valor: true };
   const nota = campoTexto({ id: "c-nota", etiqueta: "Nota (opcional)", max: 120 });
-  poner(vista, ...filas.map((f) => f.nodo),
+  const fiscal = tarjetaFiscal(hoy, app);
+  poner(vista, ...filas.map((f) => f.nodo), fiscal.nodo,
     h("div", { class: "tarjeta caja form" },
       h("div", { style: { display: "flex", alignItems: "center", justifyContent: "space-between", gap: "12px" } },
         h("span", null, h("b", null, "Corregir los saldos a lo contado"), h("span", { class: "ayuda", style: { display: "block" } }, "Si falta o sobra, se anota la diferencia para que mañana empiece cuadrado.")),
@@ -261,7 +264,10 @@ function pintarCierre(vista, app) {
         const datos = filas.map(({ c, contado }) => ({ cuenta: c.id, esperado: c.saldo, contado: contado.valor() })).filter((f) => f.contado != null);
         if (!datos.length) { avisar("Escribe lo contado en al menos una cuenta"); return; }
         if (datos.some((f) => cuentaPorId(f.cuenta)?.moneda === "VES") && ajustar.valor && !tasa()) { app.pedirTasa(); return; }
-        if (await intentar(() => guardarCierre({ fecha: hoy, filas: datos, nota: nota.entrada.value, ajustar: ajustar.valor }), "Cierre guardado")) app.refrescar();
+        if (!(await intentar(() => guardarCierre({ fecha: hoy, filas: datos, nota: nota.entrada.value, ajustar: ajustar.valor, reporteZ: fiscal.reporteZ() }), "Cierre guardado"))) return;
+        // Buen momento para la copia: el día ya está completo
+        if (!enMarco && diasDesdeCopia() !== 0 && await confirmar("Guarda la copia de hoy", "Ya cerraste la caja. Guarda una copia de seguridad y mándala a WhatsApp o Drive: si le pasa algo al teléfono, no pierdes el día.", { boton: "Guardar copia" })) seccion = "copia";
+        app.refrescar();
       } }, icono("check", 20), "Guardar cierre de hoy")));
 
   const pasados = [...estado.cierres].sort((a, b) => b.fecha.localeCompare(a.fecha)).slice(0, 10);
@@ -270,9 +276,80 @@ function pintarCierre(vista, app) {
       h("div", { class: "tarjeta caja", style: { paddingBlock: "4px" } }, h("ul", { class: "filas" }, pasados.map((ci) => {
         const difs = ci.filas.filter((f) => Math.abs(f.contado - f.esperado) >= 0.005);
         return h("li", null, h("div", { class: "fila-texto" }, h("b", null, C.nombreDia(ci.fecha)),
-          h("span", null, difs.length ? difs.map((f) => `${nombreCuenta(f.cuenta)}: ${f.contado > f.esperado ? "sobró" : "faltó"} ${enMoneda(f.cuenta, Math.abs(f.contado - f.esperado))}`).join("; ") : "Todo cuadró")));
+          h("span", null, difs.length ? difs.map((f) => `${nombreCuenta(f.cuenta)}: ${f.contado > f.esperado ? "sobró" : "faltó"} ${enMoneda(f.cuenta, Math.abs(f.contado - f.esperado))}`).join("; ") : "Todo cuadró"),
+          ci.reporteZ ? h("span", { class: "num" }, `Reporte Z ${bs(ci.reporteZ.bs)} · panel ${bs(ci.reporteZ.panelBs)}`) : null));
       }))));
   }
+}
+
+/* Cuadre con la máquina fiscal: lo vendido hoy en el panel (en Bs, con la tasa de cada venta) contra el Reporte Z.
+   Si se anotan los números de factura, también lista las ventas de hoy que no tienen. */
+function tarjetaFiscal(hoy, app) {
+  const ventasHoy = estado.ventas.filter((v) => v.estado === "confirmada" && v.dia === hoy);
+  const tasaHoy = tasa()?.valor || null;
+  const faltaTasa = ventasHoy.some((v) => !v.tasa) && !tasaHoy;
+  const panelBs = Math.round(ventasHoy.reduce((s, v) => s + v.total * (v.tasa || tasaHoy || 0), 0) * 100) / 100;
+  const z = campoMonto({ id: "c-z", moneda: "VES" });
+  z.nodo.querySelector(".ayuda")?.remove();
+  const cuadre = h("p", { class: "ayuda num", "aria-live": "polite" });
+  z.entrada.addEventListener("input", () => {
+    const valor = z.valor();
+    if (valor == null || !panelBs) { cuadre.textContent = ""; return; }
+    const d = panelBs - valor;
+    const bien = Math.abs(d) <= Math.max(1, panelBs * 0.01);
+    cuadre.textContent = bien ? "Cuadra con lo vendido en el panel" : d > 0 ? `Faltan unos ${bs(d)} por facturar` : `La máquina fiscal tiene ${bs(-d)} más que el panel`;
+    cuadre.className = `ayuda num ${bien ? "sube" : "baja"}`;
+  });
+
+  const sinFactura = ajustesImpresion().facturas ? ventasSinFactura(hoy) : [];
+  const listaSinFactura = sinFactura.length ? h("div", null,
+    h("p", { class: "etiqueta", style: { marginTop: "6px" } }, `${sinFactura.length} ${sinFactura.length === 1 ? "venta de hoy no tiene" : "ventas de hoy no tienen"} número de factura`),
+    h("ul", { class: "filas" }, sinFactura.map((v) => {
+      const lugar = h("div", null);
+      const boton = h("button", { class: "boton chico toca factura-falta", type: "button", onclick: () => editarFactura(v, null, {
+        alGuardar: (n) => { if (n) reemplazar(lugar, h("span", { class: "num sube" }, `N° ${n}`)); },
+      }) }, "Anotar");
+      poner(lugar, boton);
+      return h("li", null, h("div", { class: "fila-texto" }, h("b", null, `#${v.num} ${v.cliente}`), h("span", { class: "num" }, usd(v.total))), lugar);
+    }))) : null;
+
+  const nodo = h("div", { class: "tarjeta caja form" },
+    h("div", null, h("b", null, "Cuadre con la máquina fiscal"), h("p", { class: "ayuda", style: { margin: "2px 0 0" } }, "Opcional. Compara el panel con el Reporte Z del día.")),
+    h("p", { class: "num", style: { margin: 0 } }, "Vendido hoy en el panel: ", h("b", null, faltaTasa ? "falta la tasa del día" : bs(panelBs))),
+    h("div", null, h("label", { class: "etiqueta", for: "c-z" }, "Total del Reporte Z (Bs)"), z.entrada, cuadre),
+    listaSinFactura);
+  return { nodo, reporteZ: () => (z.valor() > 0 ? { bs: z.valor(), panelBs } : null) };
+}
+
+/* ───────── Impresora y factura fiscal ───────── */
+function pintarImpresion(vista, app) {
+  const aj = ajustesImpresion();
+  const cambiar = async (cambios, aviso) => { if (await intentar(() => cambiarImpresion(cambios), aviso)) app.refrescar(); };
+  const opcion = (titulo, ayuda, activo, alCambiar) => h("div", { class: "tarjeta caja", style: { display: "flex", alignItems: "center", justifyContent: "space-between", gap: "12px" } },
+    h("span", null, h("b", null, titulo), h("span", { class: "ayuda", style: { display: "block" } }, ayuda)),
+    interruptor(activo, alCambiar, titulo));
+  poner(vista, tituloSeccion("Impresora y factura fiscal"),
+    h("div", { class: "tarjeta caja form" },
+      h("b", null, "Tamaño del papel"),
+      segmento([["58", "58 mm"], ["80", "80 mm"]], String(aj.ancho), (id) => cambiar({ ancho: Number(id) }, `Papel de ${id} mm`), "Tamaño del papel"),
+      h("p", { class: "ayuda", style: { margin: 0 } }, "La mayoría de las impresoras térmicas pequeñas son de 58 mm.")),
+    opcion("Imprimir la comanda al aceptar", "Al aceptar un pedido de WhatsApp y al vender en caja con «Enviar a cocina».", aj.comandaAuto,
+      (v) => cambiar({ comandaAuto: v }, v ? "La comanda se imprimirá al aceptar" : "La comanda ya no se imprime sola")),
+    opcion("Anotar el número de factura fiscal", "En cada venta, para cuadrar el panel con la máquina fiscal.", aj.facturas,
+      (v) => cambiar({ facturas: v }, v ? "Ahora puedes anotar el número de factura" : "Ya no se pide el número de factura")),
+    h("div", { class: "acciones", style: { margin: "4px 0 14px" } },
+      h("button", { class: "boton mostaza toca", type: "button", onclick: () => imprimir(["comanda", "ticket"], ventaDePrueba()) }, icono("imprimir", 20), "Imprimir una prueba"),
+      h("button", { class: "boton toca", type: "button", onclick: () => abrirImpresion(ventaDePrueba(), { app }) }, "Ver cómo sale")),
+    h("h3", { class: "subtitulo" }, "Cómo conectar la impresora"),
+    h("div", { class: "tarjeta caja" }, h("ul", { class: "lista-ayuda" },
+      h("li", null, h("b", null, "Térmica Bluetooth o USB con Android: "), "instala RawBT (o la app de tu impresora) y actívala como servicio de impresión. Al tocar Imprimir, elige esa impresora y el papel de ", `${aj.ancho} mm.`),
+      h("li", null, h("b", null, "En computadora: "), "instala la impresora en Windows y elígela en la ventana de imprimir. Pon márgenes «Ninguno» y quita «Encabezados y pies de página»."),
+      h("li", null, "El navegador siempre muestra la ventana de imprimir antes de imprimir; la impresora recuerda lo que elegiste la última vez."))),
+    h("h3", { class: "subtitulo" }, "Sobre la factura fiscal"),
+    h("div", { class: "aviso-caja" }, icono("alerta", 20), h("div", null,
+      "El panel no emite facturas fiscales. La factura sale de tu máquina fiscal o del medio de facturación que te autorice el SENIAT. ",
+      "La comanda y el ticket dicen «Documento no fiscal»: sirven para la cocina y como comprobante interno. ",
+      "Anota el número de factura en cada venta y, al cerrar la caja, compara con el Reporte Z.")));
 }
 
 /* ───────── Historial de ventas ───────── */
@@ -311,11 +388,14 @@ function detalleVenta(v, app) {
       (v.pagos || []).length ? h("ul", { class: "filas", style: { marginTop: "8px" } }, v.pagos.map((p) =>
         h("li", null, h("div", { class: "fila-texto" }, h("b", null, nombreCuenta(p.cuenta)), h("span", null, fechaHora(p.creado))),
           h("div", { class: "fila-monto num" }, cuentaPorId(p.cuenta)?.moneda === "VES" ? bs(p.bs) : usd(p.usd))))) : null,
+      v.factura && v.estado !== "confirmada" ? h("p", { class: "ayuda", style: { marginTop: "8px" } }, `Factura fiscal N° ${v.factura}`) : null,
       h("div", { class: "acciones" },
         debe > 0.004 ? h("button", { class: "boton verde toca", type: "button", onclick: () => { cerrar(); abrirCobro({
           titulo: `Cobrar #${v.num}`, total: v.total, yaPagado: C.pagado(v), app,
           alConfirmar: async (pagos) => { await registrarCobro(v, pagos); app.refrescar(); avisar("Cobro registrado"); },
         }); } }, `Cobrar ${usd(debe)}`) : null,
+        v.estado === "confirmada" ? h("button", { class: "boton toca", type: "button", onclick: () => { cerrar(); abrirImpresion(v, { tipo: "ticket", app }); } }, icono("imprimir", 18), "Imprimir") : null,
+        v.estado === "confirmada" && (ajustesImpresion().facturas || v.factura) ? botonFactura(v, app, { alGuardar: () => cerrar() }) : null,
         v.estado === "confirmada" ? h("button", { class: "boton toca", type: "button", onclick: () => { cerrar(); anular(v, app); } }, "Anular venta") : null),
     );
   });

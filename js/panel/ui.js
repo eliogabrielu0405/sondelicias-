@@ -1,8 +1,37 @@
 /* Piezas de pantalla del panel */
 import { poner, reemplazar } from "../comun.js";
 import { h, icono, abrirHoja, avisar, usd, bs, leerMonto, numero } from "../comun.js";
+import { PRODUCTOS, CATEGORIAS } from "../../menu.js";
 
 export { h, icono, abrirHoja, avisar };
+
+/* Foto de un producto: la misma de la página de pedidos (menu.js), en su versión liviana de 240 px.
+   Con `sizes` el navegador puede pedir la grande (400 px) en pantallas que la necesiten.
+   Sin foto, o si no carga (por ejemplo sin internet), queda el emoji de la categoría. */
+const FOTO_MENU = new Map(PRODUCTOS.filter((p) => p.foto).map((p) => [p.id, p.foto]));
+const EMOJI_MENU = new Map(CATEGORIAS.map((c) => [c.id, c.emoji]));
+export const fotoDe = (p) => (p && (p.foto || FOTO_MENU.get(p.id))) || "";
+
+export function fotoProducto(p, { clase = "", sizes = "", emoji } = {}) {
+  const ruta = fotoDe(p);
+  const vacia = () => h("span", { class: `foto-prod sin-foto ${clase}`.trim(), "aria-hidden": "true" }, emoji || EMOJI_MENU.get(p?.cat) || "🍽️");
+  if (!ruta) return vacia();
+  const chica = ruta.replace(/\.webp$/i, "-240.webp");
+  const variante = chica !== ruta;
+  const img = h("img", {
+    class: `foto-prod ${clase}`.trim(), alt: "", loading: "lazy", decoding: "async", width: 240, height: 240,
+    sizes: variante && sizes ? sizes : null,
+    srcset: variante && sizes ? `${chica} 240w, ${ruta} 400w` : null,
+    src: variante ? chica : ruta,
+  });
+  let fallos = 0;
+  img.addEventListener("error", () => {
+    fallos += 1;
+    if (fallos === 1 && variante) { img.removeAttribute("srcset"); img.removeAttribute("sizes"); img.src = ruta; }
+    else img.replaceWith(vacia());
+  });
+  return img;
+}
 
 export const hora = (ms) => new Date(ms).toLocaleTimeString("es-VE", { hour: "numeric", minute: "2-digit" });
 export const fechaHora = (ms) => new Date(ms).toLocaleString("es-VE", { day: "numeric", month: "short", hour: "numeric", minute: "2-digit" });

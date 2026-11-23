@@ -65,12 +65,12 @@ export function leerPedidoDeTexto(texto) {
   }
   if (!p || typeof p !== "object" || p.v !== 1 || !Array.isArray(p.i)) return null;
   const items = p.i
-    .slice(0, 60)
+    .slice(0, 120)
     .map((it) => (Array.isArray(it) ? it : []))
     .map(([id, cant, opcion]) => ({
       id: limpiar(id, 12),
       cant: Math.min(99, Math.max(0, Math.floor(Number(cant) || 0))),
-      opcion: opcion == null ? "" : limpiar(opcion, 40),
+      opcion: opcion == null ? "" : limpiar(opcion, 80),
     }))
     .filter((it) => it.id && it.cant > 0);
   if (!items.length) return null;
@@ -80,6 +80,7 @@ export function leerPedidoDeTexto(texto) {
     tipo: TIPOS_ENTREGA[p.t] || "Para llevar",
     direccion: limpiar(p.d, 200),
     nota: limpiar(p.o, 200),
+    pago: limpiar(p.m, 20).replace(/[^a-z-]/g, ""),
     items,
     totalVisto: isFinite(Number(p.s)) ? redondear(p.s) : null,
     enviado: isFinite(Number(p.f)) ? Number(p.f) * 1000 : null,
@@ -127,22 +128,63 @@ export function avisar(texto) {
   temporizadorAviso = setTimeout(() => el.remove(), 1800);
 }
 
+/* ───────── "Atrás" del teléfono: cierra la hoja abierta en vez de salir de la página ─────────
+   Solo para las hojas abiertas con { historial: true }. Mientras haya alguna abierta, hay una entrada
+   propia en el historial; el botón Atrás la consume y cierra la hoja de arriba. */
+const pilaHistorial = [];
+let entradaPropia = false;
+let popsIgnorados = 0;
+function asegurarEntrada() {
+  if (entradaPropia) return;
+  try { history.pushState({ sdHoja: true }, ""); entradaPropia = true; } catch { /* sin historial */ }
+}
+function soltarEntrada() {
+  // Espera un instante: si en el mismo momento se abre otra hoja (ej. "¡Ya casi!"), la entrada se reutiliza
+  setTimeout(() => {
+    if (pilaHistorial.length || !entradaPropia) return;
+    entradaPropia = false;
+    popsIgnorados++;
+    history.back();
+  }, 0);
+}
+window.addEventListener("popstate", () => {
+  if (popsIgnorados) { popsIgnorados--; return; }
+  if (!entradaPropia) return;
+  entradaPropia = false;
+  pilaHistorial[pilaHistorial.length - 1]?.();
+  if (pilaHistorial.length) asegurarEntrada();
+});
+
 /* ───────── Hoja que sube desde abajo (ventana) ───────── */
-export function abrirHoja(titulo, llenar, { alCerrar, ancho } = {}) {
+export function abrirHoja(titulo, llenar, { alCerrar, ancho, historial = false } = {}) {
   const anterior = document.activeElement;
   const capa = h("div", { class: "fondo-hoja" });
   const hoja = h("div", { class: "hoja caja", role: "dialog", "aria-modal": "true", "aria-label": titulo, style: ancho ? { maxWidth: ancho } : null });
   let cerrada = false;
-  const cerrar = () => {
+  const porHistorial = () => cerrarInterno(true);
+  // La versión pública no recibe argumentos (se usa como onclick, que pasa el evento)
+  const cerrar = () => cerrarInterno(false);
+  function cerrarInterno(desdeHistorial) {
     if (cerrada) return;
     cerrada = true;
-    capa.remove();
+    const i = pilaHistorial.indexOf(porHistorial);
+    if (i >= 0) {
+      pilaHistorial.splice(i, 1);
+      if (!desdeHistorial) soltarEntrada();
+    }
     document.removeEventListener("keydown", tecla);
-    if (!document.querySelector(".fondo-hoja")) document.body.style.overflow = "";
+    // Sale con una animación corta (si el teléfono no pidió menos movimiento)
+    const quitar = () => {
+      capa.remove();
+      if (!document.querySelector(".fondo-hoja:not(.cerrando)")) document.body.style.overflow = "";
+    };
+    const sinMovimiento = matchMedia("(prefers-reduced-motion: reduce)").matches;
+    capa.classList.add("cerrando");
+    if (sinMovimiento) quitar(); else setTimeout(quitar, 200);
     alCerrar?.();
     anterior?.focus?.({ preventScroll: true });
-  };
-  const tecla = (e) => e.key === "Escape" && capa === [...document.querySelectorAll(".fondo-hoja")].pop() && cerrar();
+  }
+  const tecla = (e) => e.key === "Escape" && capa === [...document.querySelectorAll(".fondo-hoja:not(.cerrando)")].pop() && cerrar();
   poner(hoja, 
     h("div", { class: "hoja-cabeza" }, h("h2", null, titulo),
       h("button", { class: "redondo toca", type: "button", "aria-label": "Cerrar", onclick: cerrar }, icono("x", 22))),
@@ -154,6 +196,7 @@ export function abrirHoja(titulo, llenar, { alCerrar, ancho } = {}) {
   document.addEventListener("keydown", tecla);
   (document.getElementById("capa") || document.body).append(capa);
   document.body.style.overflow = "hidden";
+  if (historial) { pilaHistorial.push(porHistorial); asegurarEntrada(); }
   llenar(cuerpo, cerrar, hoja);
   // Solo se enfoca un campo si la hoja lo pide (autofocus); si no, el foco va a la hoja y el teclado no salta solo
   const primero = hoja.querySelector("[autofocus]");
@@ -196,6 +239,8 @@ const TRAZOS = {
   buscar: '<circle cx="11" cy="11" r="8"/><path d="m21 21-4.3-4.3"/>',
   alerta: '<path d="m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3Z"/><path d="M12 9v4"/><path d="M12 17h.01"/>',
   compartir: '<circle cx="18" cy="5" r="3"/><circle cx="6" cy="12" r="3"/><circle cx="18" cy="19" r="3"/><path d="m8.59 13.51 6.83 3.98"/><path d="m15.41 6.51-6.82 3.98"/>',
+  repetir: '<path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/><path d="M3 3v5h5"/>',
+  reloj: '<circle cx="12" cy="12" r="10"/><path d="M12 6v6l4 2"/>',
   imprimir: '<path d="M6 9V2h12v7"/><path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"/><rect width="12" height="8" x="6" y="14"/>',
 };
 
@@ -205,4 +250,41 @@ export function icono(nombre, tam = 22) {
   span.setAttribute("aria-hidden", "true");
   span.innerHTML = `<svg xmlns="http://www.w3.org/2000/svg" width="${tam}" height="${tam}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">${TRAZOS[nombre] || ""}</svg>`;
   return span;
+}
+
+/* ───────── Horario: ¿está abierto ahora? ───────── */
+const DIAS_SEMANA = ["domingo", "lunes", "martes", "miércoles", "jueves", "viernes", "sábado"];
+const aMin = (hhmm) => { const [h, m] = hhmm.split(":").map(Number); return h * 60 + m; };
+export function horaBonita(hhmm) {
+  const [h, m] = hhmm.split(":").map(Number);
+  const h12 = h % 12 || 12;
+  return `${h12}${m ? `:${String(m).padStart(2, "0")}` : ":00"} ${h < 12 ? "am" : "pm"}`;
+}
+/* Día de la semana y minutos del día en la zona del negocio */
+function ahoraEn(zona, fecha) {
+  const partes = Object.fromEntries(new Intl.DateTimeFormat("en-US", { timeZone: zona, weekday: "short", hour: "2-digit", minute: "2-digit", hourCycle: "h23" })
+    .formatToParts(fecha).map((p) => [p.type, p.value]));
+  const dia = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"].indexOf(partes.weekday);
+  return { dia, min: Number(partes.hour) * 60 + Number(partes.minute) };
+}
+/* Devuelve { abierto, texto }. Soporta horarios que pasan de medianoche (cierra < abre). */
+export function estadoHorario(horario, fecha = new Date()) {
+  const { dia, min } = ahoraEn(horario.zona, fecha);
+  const abre = aMin(horario.abre), cierra = aMin(horario.cierra);
+  const cruza = cierra <= abre;
+  const abreHoy = horario.dias.includes(dia);
+  const ayer = (dia + 6) % 7;
+  const abierto = cruza
+    ? (abreHoy && min >= abre) || (horario.dias.includes(ayer) && min < cierra)
+    : abreHoy && min >= abre && min < cierra;
+  if (abierto) return { abierto: true, texto: `Abierto ahora · cerramos a las ${horaBonita(horario.cierra)}`, corto: `Abierto hasta las ${horaBonita(horario.cierra)}` };
+  if (abreHoy && min < abre) return { abierto: false, texto: `Cerrado · abrimos hoy a las ${horaBonita(horario.abre)}`, corto: `Abre hoy a las ${horaBonita(horario.abre)}` };
+  for (let i = 1; i <= 7; i++) {
+    const d = (dia + i) % 7;
+    if (horario.dias.includes(d)) {
+      const cuando = i === 1 ? "mañana" : `el ${DIAS_SEMANA[d]}`;
+      return { abierto: false, texto: `Cerrado · abrimos ${cuando} a las ${horaBonita(horario.abre)}`, corto: `Abre ${cuando} a las ${horaBonita(horario.abre)}` };
+    }
+  }
+  return { abierto: false, texto: "Cerrado", corto: "Cerrado" };
 }
