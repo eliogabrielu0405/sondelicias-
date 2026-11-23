@@ -39,7 +39,7 @@ const CARNE_POLLO_MIXTA = ["Carne", "Pollo", "Mixta"];
 const SALCHICHA = ["Salchicha de pollo", "Polaca"];
 
 export const CATEGORIAS = [
-  { id: "hamburguesas", nombre: "Hamburguesas", emoji: "🍔", foto: "img/fotos/hamburguesas.webp" },
+  { id: "hamburguesas", nombre: "Hamburguesas", emoji: "🍔", foto: "img/fotos/hamburguesas-2.webp" },
   { id: "perros", nombre: "Perros calientes", corto: "Perros", emoji: "🌭", foto: "img/fotos/perros.webp" },
   { id: "pepitos", nombre: "Pepitos", emoji: "🥖", foto: "img/fotos/pepitos.webp" },
   { id: "sandwiches", nombre: "Sándwich y Club House", corto: "Sándwiches", emoji: "🥪", foto: "img/fotos/sandwiches.webp" },
